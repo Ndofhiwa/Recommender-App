@@ -1,26 +1,29 @@
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import os
-from dotenv import load_dotenv
 import streamlit as st
 
-# Load environment variables
-load_dotenv()
-
 def get_spotify_client():
-    """Authenticate and return a Spotify client with better error handling."""
+    """Authenticate and return a Spotify client."""
     
-    # Required scopes
-    scope = "user-library-read user-read-recently-played user-top-read"
+    # For Streamlit, use localhost redirect
+    redirect_uri = "http://localhost:8501"
     
-    # Get credentials from environment
-    client_id = os.getenv("SPOTIPY_CLIENT_ID")
-    client_secret = os.getenv("SPOTIPY_CLIENT_SECRET")
-    redirect_uri = os.getenv("SPOTIPY_REDIRECT_URI")
+    scope = "user-library-read"
     
-    # Validate credentials
+    client_id = os.environ.get("SPOTIPY_CLIENT_ID")
+    client_secret = os.environ.get("SPOTIPY_CLIENT_SECRET")
+    
     if not client_id or not client_secret:
-        st.error("Missing Spotify credentials. Please check your .env file.")
+        st.error("""
+        ❌ Spotify credentials not found!
+        
+        Please set these environment variables:
+        - SPOTIPY_CLIENT_ID
+        - SPOTIPY_CLIENT_SECRET
+        
+        You can set them in Streamlit Cloud secrets or in a .env file.
+        """)
         st.stop()
     
     try:
@@ -30,26 +33,22 @@ def get_spotify_client():
             redirect_uri=redirect_uri,
             scope=scope,
             cache_path=".cache",
-            show_dialog=True  # Force re-authentication if needed
+            show_dialog=True
         )
         
-        # Get access token
-        token_info = auth_manager.get_access_token()
-        
-        if not token_info:
-            st.error("Could not get access token. Please check your credentials.")
-            st.stop()
-        
-        # Create Spotify client
-        sp = spotipy.Spotify(auth=token_info['access_token'])
+        sp = spotipy.Spotify(auth_manager=auth_manager)
         
         # Test authentication
         user = sp.current_user()
         st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
-        
         return sp
         
     except Exception as e:
-        st.error(f"Spotify authentication error: {str(e)}")
-        st.info("Please check your credentials and try again.")
+        st.error(f"❌ Authentication failed: {e}")
+        st.info("""
+        **Troubleshooting steps:**
+        1. Make sure your Spotify app has the correct redirect URI: http://localhost:8501
+        2. Check that your credentials are correct
+        3. Try clearing the cache by deleting the `.cache` file
+        """)
         st.stop()
