@@ -5,7 +5,7 @@ import os
 import streamlit as st
 
 def get_spotify_client():
-    """Authenticate and return a Spotify client for Streamlit Cloud."""
+    """Safe authentication with both text URL and optional button."""
     
     st.write("🔄 Starting authentication process...")
     
@@ -42,17 +42,30 @@ def get_spotify_client():
             st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
             return sp
         
-        # SHOW LOGIN BUTTON - We need authentication
+        # SAFE AUTHENTICATION OPTIONS
         st.write("---")
         st.write("## 🔑 Spotify Login Required")
-        st.write("### Click the link below to authenticate:")
         
-        # Create the login link that opens in new tab
-        auth_url = auth_manager.get_authorize_url()
-        st.markdown(f'<a href="{auth_url}" target="_blank"><button style="background-color: #1DB954; color: white; padding: 15px 30px; border: none; border-radius: 25px; font-size: 18px; cursor: pointer;">🎵 LOGIN WITH SPOTIFY</button></a>', unsafe_allow_html=True)
+        # Show the safe text URL (primary method)
+        st.write("### 🔒 Safe Method (Recommended):")
+        auth_url = f"https://accounts.spotify.com/authorize?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&scope=user-library-read"
+        
+        st.text_area("Copy this URL:", auth_url, height=80, key="auth_url")
+        
+        st.write("**Steps:**")
+        st.write("1. **Copy the URL above**")
+        st.write("2. **Paste into a new browser tab**")
+        st.write("3. **Log in with Spotify**")
+        st.write("4. **Authorize the app**")
+        st.write("5. **Return here and refresh**")
+        
+        # Optional button method (with security warning)
+        st.write("### ⚡ Quick Method (Use with caution):")
+        st.markdown(f'<a href="{auth_url}" target="_blank"><button style="background-color: #1DB954; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">🎵 Login with Spotify</button></a>', unsafe_allow_html=True)
         
         st.write("---")
-        st.info("💡 **After clicking the button, a new tab will open for Spotify login. Complete the authentication there, then return to this tab and REFRESH THE PAGE.**")
+        st.warning("🚨 **SECURITY ALERT:** If you're asked to download anything, close the tab immediately and use the Safe Method above!")
+        st.info("💡 **After completing authentication in either method, return here and REFRESH THIS PAGE.**")
         
         # Try to get the token from the callback URL
         try:
@@ -62,10 +75,10 @@ def get_spotify_client():
             st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
             return sp
         except:
-            st.warning("🔐 **Waiting for authentication... Please complete the Spotify login and refresh this page.**")
+            st.warning("🔐 **Waiting for authentication... Please complete Spotify login and refresh this page.**")
             return None
         
     except Exception as e:
         st.error(f"❌ Authentication error: {str(e)}")
-        st.info("💡 **Please complete the Spotify login and refresh this page.**")
+        st.info("💡 **Please complete the Spotify login using one of the methods above and refresh this page.**")
         return None
