@@ -12,6 +12,9 @@ try:
     st.write("### Step 1: Authentication")
     sp = get_spotify_client()
     
+    if sp is None:
+        st.stop()  # Stop if not authenticated
+    
     # Step 2: Get saved songs
     st.write("### Step 2: Loading your saved songs...")
     saved_songs = get_user_saved_songs(sp, limit=20)
@@ -20,10 +23,11 @@ try:
         st.error("No saved songs found. Please save some songs in Spotify first.")
         st.stop()
     
-    # Show what songs we found
+    # Continue with the rest of your app...
     st.write("#### Your Saved Songs:")
     st.dataframe(saved_songs[['artist', 'track']])
-    
+
+    ''''x'''
     # Step 3: Get audio features
     st.write("### Step 3: Analyzing audio features...")
     
