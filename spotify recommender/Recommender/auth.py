@@ -9,9 +9,9 @@ def get_spotify_client():
     
     st.write("🔄 Starting authentication process...")
     
-    # Use Streamlit secrets (for cloud) - REQUIRED for deployment
+    # Use Streamlit secrets
     client_id = st.secrets.get("SPOTIPY_CLIENT_ID")
-    client_secret = st.secrets.get("SPOTIPY_CLIENT_SECRET")
+    client_secret = st.secrets.get("SPOTIPY_CLIENT_SECRET") 
     redirect_uri = st.secrets.get("SPOTIPY_REDIRECT_URI")
     
     st.write(f"Client ID: {client_id[:10]}..." if client_id else "Client ID: Not found")
@@ -19,55 +19,45 @@ def get_spotify_client():
     st.write(f"Redirect URI: {redirect_uri}")
     
     if not client_id or not client_secret or not redirect_uri:
-        st.error("""
-        ❌ Spotify credentials not found!
-        
-        Please set them in Streamlit Cloud secrets:
-        1. Click '⋮' → Settings → Secrets
-        2. Add:
-           SPOTIPY_CLIENT_ID = "9660c9163b164989980dda2f0209deff"
-           SPOTIPY_CLIENT_SECRET = "your_new_secret"
-           SPOTIPY_REDIRECT_URI = "https://recommender-app-czrbvi2mrvmz2ggez8ove9.streamlit.app"
-        """)
+        st.error("❌ Spotify credentials not found in secrets!")
         st.stop()
     
-    # Clear any existing cache
+    # Clear cache
     if os.path.exists(".cache"):
         os.remove(".cache")
-        st.write("🗑️ Cleared existing cache")
     
     try:
         auth_manager = SpotifyOAuth(
             client_id=client_id,
             client_secret=client_secret,
-            redirect_uri=redirect_uri,  # Uses your actual Streamlit URL
+            redirect_uri=redirect_uri,
             scope="user-library-read",
             cache_path=".cache",
             show_dialog=True
         )
         
-        # Get authorization URL
-        auth_url = auth_manager.get_authorize_url()
-        
+        # SHOW LOGIN BUTTON - This is the key part!
         st.write("---")
-        st.write("## 🔑 Login Required")
-        st.write("Click the button below to authenticate with Spotify:")
+        st.write("## 🔑 Spotify Login Required")
+        st.write("### Click the button below to authenticate:")
         
-        # Create login button
-        if st.button("🎵 Login with Spotify", type="primary", use_container_width=True):
+        # Create the login button
+        auth_url = auth_manager.get_authorize_url()
+        if st.button("🎵 LOGIN WITH SPOTIFY", type="primary", use_container_width=True):
             st.markdown(f'[Click here if not redirected]({auth_url})')
+            # Auto-redirect
             st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
             st.stop()
         
         st.write("---")
         
-        # Try to authenticate
+        # Try to get authenticated client
         sp = spotipy.Spotify(auth_manager=auth_manager)
         user = sp.current_user()
         st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
         return sp
         
     except Exception as e:
-        st.error(f"❌ Authentication failed: {e}")
-        st.info("Please click the 'Login with Spotify' button above.")
+        st.error(f"❌ Authentication failed: {str(e)}")
+        st.info("💡 **Please click the 'LOGIN WITH SPOTIFY' button above**")
         return None
