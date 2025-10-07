@@ -1,69 +1,73 @@
+# Recommender/auth.py
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
+import os
 import streamlit as st
-from Recommender.auth import get_spotify_client
-from Recommender.data import get_user_saved_songs, get_audio_features
-from Recommender.recommend import recommend_from_song
 
-# App setup
-st.set_page_config(page_title="Spotify Recommender", layout="wide")
-st.title("🎵 Spotify Song Recommender")
-
-try:
-    # Step 1: Authentication
-    st.write("### Step 1: Authentication")
-    sp = get_spotify_client()
+def get_spotify_client():
+    """Authenticate and return a Spotify client for Streamlit Cloud."""
     
-    if sp is None:
-        st.info("Please complete the Spotify authentication above to continue.")
+    st.write("🔄 Starting authentication process...")
+    
+    # Use Streamlit secrets (for cloud) or environment variables (for local)
+    client_id = st.secrets.get("SPOTIPY_CLIENT_ID", os.environ.get("SPOTIPY_CLIENT_ID"))
+    client_secret = st.secrets.get("SPOTIPY_CLIENT_SECRET", os.environ.get("SPOTIPY_CLIENT_SECRET"))
+    redirect_uri = st.secrets.get("SPOTIPY_REDIRECT_URI", os.environ.get("SPOTIPY_REDIRECT_URI"))
+    
+    st.write(f"Client ID: {client_id[:10]}..." if client_id else "Client ID: Not found")
+    st.write(f"Client Secret: {'Found' if client_secret else 'Not found'}")
+    
+    if not client_id or not client_secret:
+        st.error("""
+        ❌ Spotify credentials not found!
+        
+        Please set them in Streamlit Cloud secrets:
+        1. Click '⋮' → Settings → Secrets
+        2. Add:
+           SPOTIPY_CLIENT_ID = "your_client_id"
+           SPOTIPY_CLIENT_SECRET = "your_client_secret" 
+           SPOTIPY_REDIRECT_URI = "https://recommender-app-czrbvi2mrvmz2ggez8ove9.streamlit.app"
+        """)
         st.stop()
     
-    # Step 2: Get saved songs
-    st.write("### Step 2: Loading your saved songs...")
-    saved_songs = get_user_saved_songs(sp, limit=20)
+    # Clear any existing cache
+    if os.path.exists(".cache"):
+        os.remove(".cache")
+        st.write("🗑️ Cleared existing cache")
     
-    if saved_songs.empty:
-        st.error("No saved songs found. Please save some songs in Spotify first.")
-        st.stop()
-    
-    # Show what songs we found
-    st.write("#### Your Saved Songs:")
-    st.dataframe(saved_songs[['artist', 'track']])
-    
-    # Rest of your existing code...
-    st.write("### Step 3: Analyzing audio features...")
-    track_uris = saved_songs['uri'].tolist()
-    audio_data = get_audio_features(sp, track_uris)
-    
-    if audio_data.empty:
-        st.error("Could not fetch audio features. Please try again.")
-        st.stop()
-    
-    # Merge data
-    songs_with_audio = saved_songs.merge(audio_data, on='uri', how='left')
-    st.success(f"✅ Combined {len(songs_with_audio)} songs with audio features")
-    
-    # Recommendations
-    st.write("### Step 4: Get Recommendations")
-    valid_songs = songs_with_audio.dropna(subset=['danceability'])
-    
-    if valid_songs.empty:
-        st.error("No songs with complete audio features available.")
-        st.stop()
-    
-    song_options = [f"{row['track']} by {row['artist']}" for _, row in valid_songs.iterrows()]
-    selected_display = st.selectbox("Choose a song from your library:", song_options)
-    
-    if st.button("Find Similar Songs"):
-        with st.spinner("Finding similar songs..."):
-            recommendations = recommend_from_song(selected_display, songs_with_audio, top_n=5)
-            
-            if recommendations.empty:
-                st.warning("No recommendations found. Try selecting a different song.")
-            else:
-                st.write("#### 🎧 Recommended Songs:")
-                for idx, row in recommendations.iterrows():
-                    st.write(f"**{row['track']}** by {row['artist']}")
-                    st.write(f"🔗 [Listen on Spotify]({row['spotify_link']})")
-                    st.write("---")
-
-except Exception as e:
-    st.error(f"Application error: {str(e)}")
+    try:
+        auth_manager = SpotifyOAuth(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri,
+            scope="user-library-read",
+            cache_path=".cache",
+            show_dialog=True
+        )
+        
+        # Get authorization URL to create login button
+        auth_url = auth_manager.get_authorize_url()
+        
+        st.write("---")
+        st.write("## 🔑 Login Required")
+        st.write("Click the button below to authenticate with Spotify:")
+        
+        # Create login button
+        if st.button("🎵 Login with Spotify", type="primary", use_container_width=True):
+            # This will redirect to Spotify
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+            st.info("Redirecting to Spotify...")
+            st.stop()
+        
+        st.write("---")
+        
+        # Try to authenticate (will work after user authorizes)
+        sp = spotipy.Spotify(auth_manager=auth_manager)
+        user = sp.current_user()
+        st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
+        return sp
+        
+    except Exception as e:
+        st.error(f"❌ Authentication failed: {e}")
+        st.info("Please click the 'Login with Spotify' button above to authorize the app.")
+        return None
