@@ -7,14 +7,20 @@ from Recommender.recommend import recommend_from_song
 st.set_page_config(page_title="Spotify Recommender", layout="wide")
 st.title("🎵 Spotify Song Recommender")
 
+# Add a refresh button at the top
+if st.button("🔄 Refresh Authentication Status"):
+    st.experimental_rerun()
+
 try:
     # Step 1: Authentication
     st.write("### Step 1: Authentication")
     sp = get_spotify_client()
     
     if sp is None:
-        st.info("Please complete the Spotify authentication above to continue.")
+        st.info("👆 **Please complete the authentication using one of the methods above, then refresh this page.**")
         st.stop()
+    
+    # If we get here, authentication was successful!
     
     # Step 2: Get saved songs
     st.write("### Step 2: Loading your saved songs...")
