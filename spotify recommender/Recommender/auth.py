@@ -3,7 +3,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import os
 import streamlit as st
-import webbrowser
 
 def get_spotify_client():
     """Manual authentication flow to avoid redirect loops."""
@@ -38,8 +37,8 @@ def get_spotify_client():
             show_dialog=True
         )
         
-        # Check if we're in a callback (has URL parameters)
-        query_params = st.experimental_get_query_params()
+        # Check if we're in a callback (has URL parameters) - USING NEW METHOD
+        query_params = st.query_params  # NEW: Fixed deprecated method
         
         if 'code' in query_params:
             # We're in the callback - try to get the token
@@ -49,7 +48,7 @@ def get_spotify_client():
                 user = sp.current_user()
                 st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
                 # Clear the URL parameters
-                st.experimental_set_query_params()
+                st.query_params.clear()  # NEW: Fixed deprecated method
                 return sp
             except Exception as e:
                 st.error(f"❌ Callback processing failed: {e}")
