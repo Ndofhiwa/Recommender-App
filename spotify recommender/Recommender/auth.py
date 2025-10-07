@@ -36,20 +36,17 @@ def get_spotify_client():
             show_dialog=True
         )
         
-        # SHOW LOGIN BUTTON - This is the key part!
+        # SHOW LOGIN BUTTON - Opens in new tab
         st.write("---")
         st.write("## 🔑 Spotify Login Required")
-        st.write("### Click the button below to authenticate:")
+        st.write("### Click the link below to authenticate:")
         
-        # Create the login button
+        # Create the login link that opens in new tab
         auth_url = auth_manager.get_authorize_url()
-        if st.button("🎵 LOGIN WITH SPOTIFY", type="primary", use_container_width=True):
-            st.markdown(f'[Click here if not redirected]({auth_url})')
-            # Auto-redirect
-            st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
-            st.stop()
+        st.markdown(f'<a href="{auth_url}" target="_blank"><button style="background-color: #1DB954; color: white; padding: 15px 30px; border: none; border-radius: 25px; font-size: 18px; cursor: pointer;">🎵 LOGIN WITH SPOTIFY</button></a>', unsafe_allow_html=True)
         
         st.write("---")
+        st.info("💡 **After clicking the button, a new tab will open for Spotify login. Complete the authentication there, then return to this tab.**")
         
         # Try to get authenticated client
         sp = spotipy.Spotify(auth_manager=auth_manager)
@@ -59,5 +56,5 @@ def get_spotify_client():
         
     except Exception as e:
         st.error(f"❌ Authentication failed: {str(e)}")
-        st.info("💡 **Please click the 'LOGIN WITH SPOTIFY' button above**")
+        st.info("💡 **Please click the 'LOGIN WITH SPOTIFY' button above and complete the authentication in the new tab.**")
         return None
