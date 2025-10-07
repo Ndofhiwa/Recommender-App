@@ -22,10 +22,6 @@ def get_spotify_client():
         st.error("❌ Spotify credentials not found in secrets!")
         st.stop()
     
-    # Clear cache
-    if os.path.exists(".cache"):
-        os.remove(".cache")
-    
     try:
         auth_manager = SpotifyOAuth(
             client_id=client_id,
@@ -36,7 +32,17 @@ def get_spotify_client():
             show_dialog=True
         )
         
-        # SHOW LOGIN BUTTON - Opens in new tab
+        # Check if we already have a token
+        token_info = auth_manager.get_cached_token()
+        
+        if token_info and not auth_manager.is_token_expired(token_info):
+            # We're already authenticated
+            sp = spotipy.Spotify(auth_manager=auth_manager)
+            user = sp.current_user()
+            st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
+            return sp
+        
+        # SHOW LOGIN BUTTON - We need authentication
         st.write("---")
         st.write("## 🔑 Spotify Login Required")
         st.write("### Click the link below to authenticate:")
@@ -46,15 +52,20 @@ def get_spotify_client():
         st.markdown(f'<a href="{auth_url}" target="_blank"><button style="background-color: #1DB954; color: white; padding: 15px 30px; border: none; border-radius: 25px; font-size: 18px; cursor: pointer;">🎵 LOGIN WITH SPOTIFY</button></a>', unsafe_allow_html=True)
         
         st.write("---")
-        st.info("💡 **After clicking the button, a new tab will open for Spotify login. Complete the authentication there, then return to this tab.**")
+        st.info("💡 **After clicking the button, a new tab will open for Spotify login. Complete the authentication there, then return to this tab and REFRESH THE PAGE.**")
         
-        # Try to get authenticated client
-        sp = spotipy.Spotify(auth_manager=auth_manager)
-        user = sp.current_user()
-        st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
-        return sp
+        # Try to get the token from the callback URL
+        try:
+            # This will handle the callback and get the token
+            sp = spotipy.Spotify(auth_manager=auth_manager)
+            user = sp.current_user()
+            st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
+            return sp
+        except:
+            st.warning("🔐 **Waiting for authentication... Please complete the Spotify login and refresh this page.**")
+            return None
         
     except Exception as e:
-        st.error(f"❌ Authentication failed: {str(e)}")
-        st.info("💡 **Please click the 'LOGIN WITH SPOTIFY' button above and complete the authentication in the new tab.**")
+        st.error(f"❌ Authentication error: {str(e)}")
+        st.info("💡 **Please complete the Spotify login and refresh this page.**")
         return None
