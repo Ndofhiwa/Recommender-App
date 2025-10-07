@@ -3,9 +3,10 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import os
 import streamlit as st
+import webbrowser
 
 def get_spotify_client():
-    """Safe authentication with both text URL and optional button."""
+    """Manual authentication flow to avoid redirect loops."""
     
     st.write("🔄 Starting authentication process...")
     
@@ -14,15 +15,20 @@ def get_spotify_client():
     client_secret = st.secrets.get("SPOTIPY_CLIENT_SECRET") 
     redirect_uri = st.secrets.get("SPOTIPY_REDIRECT_URI")
     
-    st.write(f"Client ID: {client_id[:10]}..." if client_id else "Client ID: Not found")
-    st.write(f"Client Secret: {'Found' if client_secret else 'Not found'}")
+    st.write(f"Client ID: {client_id[:10]}...")
+    st.write(f"Client Secret: Found")
     st.write(f"Redirect URI: {redirect_uri}")
     
     if not client_id or not client_secret or not redirect_uri:
-        st.error("❌ Spotify credentials not found in secrets!")
+        st.error("❌ Spotify credentials not found!")
         st.stop()
     
     try:
+        # Clear any cached tokens
+        if os.path.exists(".cache"):
+            os.remove(".cache")
+            st.write("🗑️ Cleared previous authentication cache")
+        
         auth_manager = SpotifyOAuth(
             client_id=client_id,
             client_secret=client_secret,
@@ -32,53 +38,63 @@ def get_spotify_client():
             show_dialog=True
         )
         
-        # Check if we already have a token
+        # Check if we're in a callback (has URL parameters)
+        query_params = st.experimental_get_query_params()
+        
+        if 'code' in query_params:
+            # We're in the callback - try to get the token
+            try:
+                st.write("🔄 Processing callback...")
+                sp = spotipy.Spotify(auth_manager=auth_manager)
+                user = sp.current_user()
+                st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
+                # Clear the URL parameters
+                st.experimental_set_query_params()
+                return sp
+            except Exception as e:
+                st.error(f"❌ Callback processing failed: {e}")
+        
+        # Check if we already have a valid token
         token_info = auth_manager.get_cached_token()
-        
         if token_info and not auth_manager.is_token_expired(token_info):
-            # We're already authenticated
             sp = spotipy.Spotify(auth_manager=auth_manager)
             user = sp.current_user()
             st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
             return sp
         
-        # SAFE AUTHENTICATION OPTIONS
+        # MANUAL AUTHENTICATION FLOW
         st.write("---")
-        st.write("## 🔑 Spotify Login Required")
+        st.write("## 🔑 Manual Authentication Required")
+        st.write("### Due to browser security, we need to manually handle authentication.")
         
-        # Show the safe text URL (primary method)
-        st.write("### 🔒 Safe Method (Recommended):")
-        auth_url = f"https://accounts.spotify.com/authorize?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&scope=user-library-read"
+        # Generate the authorization URL
+        auth_url = auth_manager.get_authorize_url()
         
-        st.text_area("Copy this URL:", auth_url, height=80, key="auth_url")
+        col1, col2 = st.columns(2)
         
-        st.write("**Steps:**")
-        st.write("1. **Copy the URL above**")
-        st.write("2. **Paste into a new browser tab**")
-        st.write("3. **Log in with Spotify**")
-        st.write("4. **Authorize the app**")
-        st.write("5. **Return here and refresh**")
+        with col1:
+            st.write("### Method 1: Copy URL")
+            st.text_area("Copy this URL:", auth_url, height=60)
+            st.write("1. Copy the URL above")
+            st.write("2. Open a new tab")
+            st.write("3. Paste and go")
+            st.write("4. Log in with Spotify")
+            st.write("5. You'll be redirected back here")
         
-        # Optional button method (with security warning)
-        st.write("### ⚡ Quick Method (Use with caution):")
-        st.markdown(f'<a href="{auth_url}" target="_blank"><button style="background-color: #1DB954; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">🎵 Login with Spotify</button></a>', unsafe_allow_html=True)
+        with col2:
+            st.write("### Method 2: Direct Link")
+            st.markdown(f'<a href="{auth_url}" target="_blank" style="text-decoration: none;"><button style="background-color: #1DB954; color: white; padding: 12px 24px; border: none; border-radius: 25px; font-size: 16px; cursor: pointer; width: 100%;">🎵 Open Spotify Login</button></a>', unsafe_allow_html=True)
+            st.write("1. Click the button")
+            st.write("2. Log in with Spotify") 
+            st.write("3. Authorize the app")
+            st.write("4. You'll return here automatically")
         
         st.write("---")
-        st.warning("🚨 **SECURITY ALERT:** If you're asked to download anything, close the tab immediately and use the Safe Method above!")
-        st.info("💡 **After completing authentication in either method, return here and REFRESH THIS PAGE.**")
+        st.info("💡 **After authorizing, you'll be redirected back here. If it shows the login page again, just wait a moment and refresh.**")
         
-        # Try to get the token from the callback URL
-        try:
-            # This will handle the callback and get the token
-            sp = spotipy.Spotify(auth_manager=auth_manager)
-            user = sp.current_user()
-            st.success(f"✅ Authenticated as: {user.get('display_name', 'User')}")
-            return sp
-        except:
-            st.warning("🔐 **Waiting for authentication... Please complete Spotify login and refresh this page.**")
-            return None
+        # Return None to indicate we need authentication
+        return None
         
     except Exception as e:
         st.error(f"❌ Authentication error: {str(e)}")
-        st.info("💡 **Please complete the Spotify login using one of the methods above and refresh this page.**")
         return None
